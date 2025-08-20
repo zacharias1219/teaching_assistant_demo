@@ -1,0 +1,241 @@
+Product Requirements Document (PRD)
+Application: Teacher’s AssistantVersion: v1.1 (Proof-of-Concept, Simplified)Date: August 20, 2025  
+1. Overview
+Teacher’s Assistant is a simple Streamlit web app for a single school to manage tests and grading. Admins create tests, upload question papers (PDF/image), and manage students. Students upload answer sheets (PDF/image) and view results instantly. OpenAI’s gpt-4o-mini handles OCR and grading, with Admins able to tweak prompts for better accuracy. Data is stored in MongoDB, and files are kept in GridFS for 7 days. Separate dashboards keep it clean for Admins and Students.
+Purpose
+
+Simplify test creation and student management for Admins.  
+Automate grading with instant feedback for Students.  
+Allow Admins to adjust OCR/grading for accuracy.  
+Provide downloadable PDF results.
+
+Value
+
+Fast: Grade answers in <15 seconds with AI.  
+Simple: Easy test setup and answer uploads.  
+Clear: Detailed feedback for Students; Admins can override scores.  
+Secure: Basic login and encrypted file storage.
+
+2. Users
+
+Admins: Create/edit/delete tests, manage students, upload answers, tweak prompts.  
+Students: View assigned tests, upload answers, see results.
+
+3. Core Features
+REQ-001: Simple Login
+
+What: Username/password login for Admins and Students on one page.  
+How: Streamlit’s built-in authenticator; redirects to Admin or Student dashboard based on role.  
+Data: MongoDB Users collection (user_id, username, password, role: "admin" or "student").  
+Must Have:  
+Login works in <500 ms.  
+Wrong password locks out after 5 tries (5-minute wait).  
+Passwords hashed securely.
+
+
+
+REQ-002: Student Management (Admin Only)
+
+What: Admins add/edit/delete student profiles.  
+How: Form and table in Admin dashboard.  
+Data: MongoDB Students collection (student_id, name, class).  
+Must Have:  
+Add, edit, delete students in <5 seconds.  
+Search by name or class in <300 ms.  
+Required fields enforced.
+
+
+
+REQ-003: Test Creation (Admin Only)
+
+What: Admins create/edit/delete tests with question file (PDF/image) and optional rubric.  
+How: “New Test” form for title, subject, date, file upload, and rubric (text input).  
+Data: MongoDB Tests collection (test_id, title, subject, date, rubric, question_file in GridFS).  
+Must Have:  
+Create/edit/delete tests in <5 seconds.  
+No duplicate tests (same title and date).  
+Files stored in GridFS for 7 days.  
+Tests table sortable by date.
+
+
+
+REQ-004: Answer Upload
+
+What: Students upload answers for assigned tests; Admins upload for any student.  
+How: Test Detail page with student dropdown (Admins) or direct upload (Students).  
+Data: MongoDB Submissions collection (submission_id, test_id, student_id, date, status, answer_file in GridFS).  
+Must Have:  
+Upload in <5 seconds; no duplicates for same test/student.  
+Students see only their class’s tests.  
+Files stored in GridFS for 7 days.  
+Auto-triggers grading.
+
+
+
+REQ-005: AI Grading with OCR
+
+What: OpenAI gpt-4o-mini extracts text (OCR) and grades answers.  
+How: Streams question/answer files to API; returns scores and feedback.  
+Data: Submissions collection updated with total_score, per_question_scores, remarks, strengths, improvements, rubric_filled (if rubric exists).  
+Must Have:  
+Grading done in <15 seconds.  
+Results include: total score, per-question scores, remarks, strengths, improvements, rubric table (if provided).  
+Admins can edit scores in Submission Detail.  
+Errors retry 3 times; notify Admin on failure.
+
+
+
+REQ-006: Prompt Customization (Admin Only)
+
+What: Admins tweak OCR and grading prompts.  
+How: Settings page with text inputs for OCR and grading prompts.  
+Data: MongoDB Settings collection (prompt_type: "ocr" or "grading", prompt_text).  
+Must Have:  
+Save/reset prompts in <5 seconds.  
+Default prompts for OCR (“Extract all text clearly”) and grading (“Grade for accuracy; list strengths/improvements”).  
+Prompts apply to all API calls.
+
+
+
+REQ-007: Results and Download
+
+What: View and download results as PDF.  
+How: Submission Detail page shows scores, feedback, and rubric table; PDF download button.  
+Data: PDF includes student_name, test_title, date, total_score, per_question_scores, remarks, strengths, improvements, rubric_filled.  
+Must Have:  
+Results show instantly after grading.  
+PDF generated in <5 seconds; named StudentName_TestTitle_YYYY-MM-DD.pdf.  
+Clean table layout for results.
+
+
+
+REQ-008: Storage
+
+What: Store data in MongoDB; files in GridFS for 7 days.  
+How: MongoDB for Users, Students, Tests, Submissions, Settings; GridFS for PDFs/images.  
+Must Have:  
+Queries <300 ms for 1,000 records.  
+Files encrypted; deleted after 7 days.  
+Indexes on test_id, student_id, date.
+
+
+
+4. App Flow
+Admin
+
+Login: Enter username/password; go to Admin Dashboard.  
+Admin Dashboard: See Students, Tests, Submissions tables; buttons for “Add Student,” “New Test,” “Settings.”  
+Manage Students: Add/edit/delete via Students table.  
+Manage Tests: Create/edit/delete via New Test form; upload question file, optional rubric.  
+Upload Answers: Select student, upload answer file in Test Detail; grading auto-starts.  
+View Results: See/edit results in Submission Detail; download PDF.  
+Tweak Prompts: Edit OCR/grading prompts in Settings.
+
+Student
+
+Login: Enter username/password; go to Student Dashboard.  
+Student Dashboard: See assigned Tests and Submissions.  
+Upload Answers: Upload answer file in Test Detail; grading auto-starts.  
+View Results: See results in Submission Detail; download PDF.
+
+5. Screens (Streamlit Multi-Page)
+
+
+
+Screen
+Role
+Description
+
+
+
+Login
+Both
+Username/password; redirects by role.
+
+
+Admin Dashboard
+Admin
+Students, Tests, Submissions tables; action buttons.
+
+
+Students List
+Admin
+Add/edit/delete students; search by name/class.
+
+
+New/Edit Test
+Admin
+Form for test metadata, file upload, rubric.
+
+
+Test Detail
+Both
+Test info; answer upload; Submissions table.
+
+
+Submission Detail
+Both
+Results table; score edit (Admin); PDF download.
+
+
+Settings
+Admin
+Edit OCR/grading prompts; reset option.
+
+
+Total Screens: 6 (merged Students List into Admin Dashboard for simplicity).
+6. Non-Functional Requirements
+
+Performance:  
+UI loads <300 ms for 1,000 students.  
+Grading <15 seconds.  
+Queries <300 ms.
+
+
+Security:  
+HTTPS; encrypt GridFS files.  
+Sanitize inputs; role-based access.  
+Redact PII in logs.
+
+
+Usability:  
+Simple Streamlit UI with Tailwind CSS.  
+Mobile-friendly; clear labels.
+
+
+Reliability:  
+99.9% uptime.  
+Retry API failures 3 times; show error messages.
+
+
+
+7. Tech Stack
+
+Frontend: Streamlit (Python) with Tailwind CSS.  
+Backend: Streamlit; FastAPI if needed for production API endpoints.  
+Database: MongoDB (Users, Students, Tests, Submissions, Settings); GridFS for files.  
+AI: OpenAI gpt-4o-mini for OCR and grading.  
+Preprocessing: OpenCV for image enhancement (deskew, contrast).
+
+8. Acceptance Criteria
+
+Login redirects correctly in <500 ms.  
+Student CRUD works in <5 seconds (Admin only).  
+Test CRUD works in <5 seconds; no duplicates.  
+Answer uploads done in <5 seconds; no duplicates.  
+Grading completes in <15 seconds; results match schema.  
+Prompt customization saves/resets in <5 seconds.  
+PDF results generated in <5 seconds.  
+UI/queries <300 ms; secure and reliable.
+
+9. Future Ideas
+
+Batch answer uploads for Admins.  
+In-app notifications for new tests/results.  
+Support multiple schools.
+
+10. Risks
+
+OCR Errors: Tweak prompts; preprocess images with OpenCV.  
+API Downtime: Retry 3 times; cache results.  
+Data Privacy: Encrypt files; redact PII; GDPR-compliant.
